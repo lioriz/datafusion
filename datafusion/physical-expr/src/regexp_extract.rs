@@ -57,3 +57,112 @@ fn regexp_extract_fn(args: &[ScalarValue]) -> Result<ScalarValue> {
         None => Ok(ScalarValue::Utf8(Some("".to_string()))),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use datafusion_common::ScalarValue;
+
+    #[test]
+    fn test_basic_match() {
+        let args = vec![
+            ScalarValue::Utf8(Some("abc123".to_string())),
+            ScalarValue::Utf8(Some(r"(\d+)".to_string())),
+            ScalarValue::Int32(Some(0)),
+        ];
+        let result = regexp_extract_fn(&args).unwrap();
+        assert_eq!(result, ScalarValue::Utf8(Some("123".to_string())));
+    }
+
+    #[test]
+    fn test_named_groups_not_supported() {
+        let args = vec![
+            ScalarValue::Utf8(Some("abc123".to_string())),
+            ScalarValue::Utf8(Some(r"(?P<num>\d+)".to_string())),
+            ScalarValue::Int32(Some(0)),
+        ];
+        let result = regexp_extract_fn(&args).unwrap();
+        assert_eq!(result, ScalarValue::Utf8(Some("123".to_string())));
+    }
+
+    #[test]
+    fn test_group_match() {
+        let args = vec![
+            ScalarValue::Utf8(Some("abc123".to_string())),
+            ScalarValue::Utf8(Some(r"(a)(b)(c)".to_string())),
+            ScalarValue::Int32(Some(2)),
+        ];
+        let result = regexp_extract_fn(&args).unwrap();
+        assert_eq!(result, ScalarValue::Utf8(Some("b".to_string())));
+    }
+
+    #[test]
+    fn test_index_out_of_bounds() {
+        let args = vec![
+            ScalarValue::Utf8(Some("abc123".to_string())),
+            ScalarValue::Utf8(Some(r"(\d+)".to_string())),
+            ScalarValue::Int32(Some(5)), // Too high
+        ];
+        let result = regexp_extract_fn(&args).unwrap();
+        assert_eq!(result, ScalarValue::Utf8(Some("".to_string())));
+    }
+
+    #[test]
+    fn test_no_match_returns_empty_string() {
+        let args = vec![
+            ScalarValue::Utf8(Some("abc".to_string())),
+            ScalarValue::Utf8(Some(r"(\d+)".to_string())),
+            ScalarValue::Int32(Some(1)),
+        ];
+        let result = regexp_extract_fn(&args).unwrap();
+        assert_eq!(result, ScalarValue::Utf8(Some("".to_string())));
+    }
+
+    #[test]
+    fn test_invalid_regex_returns_error() {
+        let args = vec![
+            ScalarValue::Utf8(Some("abc123".to_string())),
+            ScalarValue::Utf8(Some("(".to_string())), // Invalid regex
+            ScalarValue::Int32(Some(0)),
+        ];
+        let result = regexp_extract_fn(&args);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("Invalid regex pattern"),
+            "Expected regex error"
+        );
+    }
+
+    #[test]
+    fn test_null_input_returns_null() {
+        let args = vec![
+            ScalarValue::Utf8(None),
+            ScalarValue::Utf8(Some(r"(\d+)".to_string())),
+            ScalarValue::Int32(Some(0)),
+        ];
+        let result = regexp_extract_fn(&args).unwrap();
+        assert_eq!(result, ScalarValue::Utf8(None));
+    }
+
+    #[test]
+    fn test_null_pattern_returns_null() {
+        let args = vec![
+            ScalarValue::Utf8(Some("abc123".to_string())),
+            ScalarValue::Utf8(None),
+            ScalarValue::Int32(Some(0)),
+        ];
+        let result = regexp_extract_fn(&args).unwrap();
+        assert_eq!(result, ScalarValue::Utf8(None));
+    }
+
+    #[test]
+    fn test_null_index_returns_null() {
+        let args = vec![
+            ScalarValue::Utf8(Some("abc123".to_string())),
+            ScalarValue::Utf8(Some(r"(\d+)".to_string())),
+            ScalarValue::Int32(None),
+        ];
+        let result = regexp_extract_fn(&args).unwrap();
+        assert_eq!(result, ScalarValue::Utf8(None));
+    }
+}

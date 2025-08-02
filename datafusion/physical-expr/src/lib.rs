@@ -24,6 +24,9 @@
 // https://github.com/apache/datafusion/issues/11143
 #![deny(clippy::clone_on_ref_ptr)]
 
+// UDFs
+pub mod regexp_extract;
+
 // Backward compatibility
 pub mod aggregate;
 pub mod analysis;
